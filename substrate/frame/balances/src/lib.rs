@@ -186,7 +186,7 @@ use sp_runtime::{
 		AtLeast32BitUnsigned, Bounded, CheckedAdd, CheckedSub, MaybeSerializeDeserialize,
 		Saturating, StaticLookup, Zero,
 	},
-	ArithmeticError, DispatchError, FixedPointOperand, Perbill, RuntimeDebug, TokenError,
+	ArithmeticError, DispatchError, FixedPointOperand, RuntimeDebug, TokenError,
 };
 use sp_std::{cmp, fmt::Debug, mem, prelude::*, result};
 pub use types::{
@@ -678,7 +678,7 @@ pub mod pallet {
 		/// This will waive the transaction fee if at least all but 10% of the accounts needed to
 		/// be upgraded. (We let some not have to be upgraded just in order to allow for the
 		/// possibililty of churn).
-		#[pallet::call_index(6)]
+		/*#[pallet::call_index(6)]
 		#[pallet::weight(T::WeightInfo::upgrade_accounts(who.len() as u32))]
 		pub fn upgrade_accounts(
 			origin: OriginFor<T>,
@@ -701,7 +701,7 @@ pub mod pallet {
 			} else {
 				Ok(Pays::Yes.into())
 			}
-		}
+		}*/
 
 		/// Set the regular balance of a given account.
 		///
