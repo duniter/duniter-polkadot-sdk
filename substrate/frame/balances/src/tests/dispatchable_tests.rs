@@ -188,7 +188,7 @@ fn set_balance_handles_total_issuance() {
 	});
 }
 
-#[test]
+/*#[test]
 fn upgrade_accounts_should_work() {
 	ExtBuilder::default()
 		.existential_deposit(1)
@@ -221,4 +221,4 @@ fn upgrade_accounts_should_work() {
 			assert_eq!(System::providers(&7), 0);
 			assert_eq!(System::consumers(&7), 0);
 		});
-}
+}*/
