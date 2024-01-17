@@ -493,7 +493,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	#[pallet::genesis_config]
+	/*#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config<I>, I: 'static = ()> {
 		pub balances: Vec<(T::AccountId, T::Balance)>,
 	}
@@ -536,6 +536,25 @@ pub mod pallet {
 				assert!(T::AccountStore::insert(who, AccountData { free, ..Default::default() })
 					.is_ok());
 			}
+		}
+	}*/
+
+	/// The Duniter pallet-balances custom genesis config allows the total issuance to be set
+	/// externally. Accounts should not be initialized through pallet_balances, as they are managed
+	/// by pallet_duniter_account.
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config<I>, I: 'static = ()> {
+		pub total_issuance: T::Balance,
+	}
+	impl<T: Config<I>, I: 'static> Default for GenesisConfig<T, I> {
+		fn default() -> Self {
+			Self { total_issuance: Default::default() }
+		}
+	}
+	#[pallet::genesis_build]
+	impl<T: Config<I>, I: 'static> BuildGenesisConfig for GenesisConfig<T, I> {
+		fn build(&self) {
+			<TotalIssuance<T, I>>::put(self.total_issuance);
 		}
 	}
 
