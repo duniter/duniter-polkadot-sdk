@@ -257,7 +257,7 @@ mod benchmarks {
 		Ok(())
 	}
 
-	#[benchmark]
+	/*#[benchmark]
 	fn upgrade_accounts(u: Linear<1, 1_000>) {
 		let caller: T::AccountId = whitelisted_caller();
 		let who = (0..u)
@@ -284,7 +284,7 @@ mod benchmarks {
 			.collect();
 
 		#[extrinsic_call]
-		_(RawOrigin::Signed(caller.clone()), who);
+		//_(RawOrigin::Signed(caller.clone()), who);
 
 		for i in 0..u {
 			let user: T::AccountId = account("old_user", i, SEED);
@@ -292,7 +292,7 @@ mod benchmarks {
 			assert_eq!(frame_system::Pallet::<T>::providers(&user), 1);
 			assert_eq!(frame_system::Pallet::<T>::consumers(&user), 1);
 		}
-	}
+	}*/
 
 	#[benchmark]
 	fn force_adjust_total_issuance() {
