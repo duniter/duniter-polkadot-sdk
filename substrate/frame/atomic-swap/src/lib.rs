@@ -55,6 +55,7 @@ use frame_support::{
 	RuntimeDebugNoBound,
 };
 use frame_system::pallet_prelude::BlockNumberFor;
+use scale_info::prelude::vec::Vec;
 use scale_info::TypeInfo;
 use sp_io::hashing::blake2_256;
 use sp_runtime::RuntimeDebug;
