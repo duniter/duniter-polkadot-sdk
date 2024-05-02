@@ -8215,7 +8215,7 @@ dependencies = [
 [[package]]
 name = "litep2p"
 version = "0.3.0"
-source = "git+https://github.com/paritytech/litep2p?branch=master#34f64350a4e7cc28a0190c48b270234dff82e29c"
+source = "git+https://github.com/paritytech/litep2p?rev=e03a6023882db111beeb24d8c0ceaac0721d3f0f#e03a6023882db111beeb24d8c0ceaac0721d3f0f"
 dependencies = [
  "async-trait",
  "bs58 0.4.0",
@@ -8227,7 +8227,7 @@ dependencies = [
  "hex-literal",
  "indexmap 2.2.6",
  "libc",
- "mockall 0.12.1",
+ "mockall",
  "multiaddr",
  "multihash 0.17.0",
  "network-interface",
@@ -8701,23 +8701,8 @@ dependencies = [
  "downcast",
  "fragile",
  "lazy_static",
- "mockall_derive 0.11.4",
+ "mockall_derive",
  "predicates 2.1.5",
- "predicates-tree",
-]
-
-[[package]]
-name = "mockall"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43766c2b5203b10de348ffe19f7e54564b64f3d6018ff7648d1e2d6d3a0f0a48"
-dependencies = [
- "cfg-if",
- "downcast",
- "fragile",
- "lazy_static",
- "mockall_derive 0.12.1",
- "predicates 3.1.0",
  "predicates-tree",
 ]
 
@@ -8731,18 +8716,6 @@ dependencies = [
  "proc-macro2 1.0.82",
  "quote 1.0.36",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "mockall_derive"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af7cbce79ec385a1d4f54baa90a76401eb15d9cab93685f62e7e9f942aa00ae2"
-dependencies = [
- "cfg-if",
- "proc-macro2 1.0.82",
- "quote 1.0.36",
- "syn 2.0.61",
 ]
 
 [[package]]
@@ -16599,7 +16572,7 @@ dependencies = [
  "futures",
  "futures-timer",
  "log",
- "mockall 0.11.4",
+ "mockall",
  "parking_lot 0.12.2",
  "sc-client-api",
  "sc-network-types",
@@ -17124,7 +17097,7 @@ dependencies = [
  "linked_hash_set",
  "litep2p",
  "log",
- "mockall 0.11.4",
+ "mockall",
  "multistream-select",
  "once_cell",
  "parity-scale-codec",
@@ -17262,7 +17235,7 @@ dependencies = [
  "futures-timer",
  "libp2p",
  "log",
- "mockall 0.11.4",
+ "mockall",
  "parity-scale-codec",
  "prost 0.12.4",
  "prost-build",
