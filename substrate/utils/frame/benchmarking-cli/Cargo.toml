@@ -78,7 +78,6 @@ substrate-test-runtime = { workspace = true, default-features = true }
 westend-runtime = { workspace = true, default-features = true }
 
 [features]
-default = ["rocksdb"]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
