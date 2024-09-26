@@ -82,7 +82,6 @@ sp-wasm-interface.default-features = true
 gethostname = { workspace = true }
 
 [features]
-default = ["rocksdb"]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
