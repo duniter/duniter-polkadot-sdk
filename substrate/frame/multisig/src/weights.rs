@@ -54,9 +54,9 @@ pub trait WeightInfo {
 	fn as_multi_create(s: u32, z: u32, ) -> Weight;
 	fn as_multi_approve(s: u32, z: u32, ) -> Weight;
 	fn as_multi_complete(s: u32, z: u32, ) -> Weight;
-	fn approve_as_multi_create(s: u32, ) -> Weight;
-	fn approve_as_multi_approve(s: u32, ) -> Weight;
-	fn cancel_as_multi(s: u32, ) -> Weight;
+	fn approve_as_multi_create(s: u32, z: u32) -> Weight;
+	fn approve_as_multi_approve(s: u32, z: u32) -> Weight;
+	fn cancel_as_multi(s: u32, z: u32) -> Weight;
 }
 
 /// Weights for `pallet_multisig` using the Substrate node and recommended hardware.
@@ -137,7 +137,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `Multisig::Multisigs` (r:1 w:1)
 	/// Proof: `Multisig::Multisigs` (`max_values`: None, `max_size`: Some(3346), added: 5821, mode: `MaxEncodedLen`)
 	/// The range of component `s` is `[2, 100]`.
-	fn approve_as_multi_create(s: u32, ) -> Weight {
+	fn approve_as_multi_create(s: u32, _z: u32) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `301 + s * (2 ±0)`
 		//  Estimated: `6811`
@@ -151,7 +151,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `Multisig::Multisigs` (r:1 w:1)
 	/// Proof: `Multisig::Multisigs` (`max_values`: None, `max_size`: Some(3346), added: 5821, mode: `MaxEncodedLen`)
 	/// The range of component `s` is `[2, 100]`.
-	fn approve_as_multi_approve(s: u32, ) -> Weight {
+	fn approve_as_multi_approve(s: u32, _z: u32) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `320`
 		//  Estimated: `6811`
@@ -165,7 +165,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Storage: `Multisig::Multisigs` (r:1 w:1)
 	/// Proof: `Multisig::Multisigs` (`max_values`: None, `max_size`: Some(3346), added: 5821, mode: `MaxEncodedLen`)
 	/// The range of component `s` is `[2, 100]`.
-	fn cancel_as_multi(s: u32, ) -> Weight {
+	fn cancel_as_multi(s: u32, _z: u32) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `492 + s * (1 ±0)`
 		//  Estimated: `6811`
@@ -255,7 +255,7 @@ impl WeightInfo for () {
 	/// Storage: `Multisig::Multisigs` (r:1 w:1)
 	/// Proof: `Multisig::Multisigs` (`max_values`: None, `max_size`: Some(3346), added: 5821, mode: `MaxEncodedLen`)
 	/// The range of component `s` is `[2, 100]`.
-	fn approve_as_multi_create(s: u32, ) -> Weight {
+	fn approve_as_multi_create(s: u32, _z: u32) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `301 + s * (2 ±0)`
 		//  Estimated: `6811`
@@ -269,7 +269,7 @@ impl WeightInfo for () {
 	/// Storage: `Multisig::Multisigs` (r:1 w:1)
 	/// Proof: `Multisig::Multisigs` (`max_values`: None, `max_size`: Some(3346), added: 5821, mode: `MaxEncodedLen`)
 	/// The range of component `s` is `[2, 100]`.
-	fn approve_as_multi_approve(s: u32, ) -> Weight {
+	fn approve_as_multi_approve(s: u32, _z: u32) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `320`
 		//  Estimated: `6811`
@@ -283,7 +283,7 @@ impl WeightInfo for () {
 	/// Storage: `Multisig::Multisigs` (r:1 w:1)
 	/// Proof: `Multisig::Multisigs` (`max_values`: None, `max_size`: Some(3346), added: 5821, mode: `MaxEncodedLen`)
 	/// The range of component `s` is `[2, 100]`.
-	fn cancel_as_multi(s: u32, ) -> Weight {
+	fn cancel_as_multi(s: u32, _z: u32) -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `492 + s * (1 ±0)`
 		//  Estimated: `6811`
