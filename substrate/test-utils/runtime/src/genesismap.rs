@@ -130,7 +130,11 @@ impl GenesisStorageBuilder {
 				authorities: authorities_sr25519.clone(),
 				..Default::default()
 			},
-			balances: pallet_balances::GenesisConfig { balances: self.balances.clone() },
+			balances: pallet_balances::GenesisConfig { total_issuance: self.balances.clone().into_iter()
+				.map((|(_p1, a)| a))
+				.reduce(|a, b| a + b)
+				.expect("Sum of balances must not overflow u64")
+			},
 		}
 	}
 
