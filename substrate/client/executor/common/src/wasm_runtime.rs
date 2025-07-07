@@ -27,7 +27,7 @@ pub const DEFAULT_HEAP_ALLOC_STRATEGY: HeapAllocStrategy =
 	HeapAllocStrategy::Static { extra_pages: DEFAULT_HEAP_ALLOC_PAGES };
 
 /// Default heap allocation pages.
-pub const DEFAULT_HEAP_ALLOC_PAGES: u32 = 2048;
+pub const DEFAULT_HEAP_ALLOC_PAGES: u32 = 4096; // duniter genesis state need a lot of memory
 
 /// A trait that defines an abstract WASM runtime module.
 ///
