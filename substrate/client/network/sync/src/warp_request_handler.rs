@@ -37,8 +37,10 @@ use std::{sync::Arc, time::Duration};
 /// Incoming warp requests bounded queue size.
 const MAX_WARP_REQUEST_QUEUE: usize = 20;
 
-/// Generates a `RequestResponseProtocolConfig` for the grandpa warp sync request protocol, refusing
-/// incoming requests.
+/// Generates a `RequestResponseProtocolConfig` for the grandpa warp sync request protocol.
+///
+/// When `inbound_queue` is `Some`, incoming requests are accepted and forwarded to the queue.
+/// Otherwise, the protocol is registered as outbound-only.
 pub fn generate_request_response_config<
 	Hash: AsRef<[u8]>,
 	B: BlockT,
@@ -47,7 +49,7 @@ pub fn generate_request_response_config<
 	protocol_id: ProtocolId,
 	genesis_hash: Hash,
 	fork_id: Option<&str>,
-	inbound_queue: async_channel::Sender<IncomingRequest>,
+	inbound_queue: Option<async_channel::Sender<IncomingRequest>>,
 ) -> N::RequestResponseProtocolConfig {
 	N::request_response_config(
 		generate_protocol_name(genesis_hash, fork_id).into(),
@@ -55,7 +57,7 @@ pub fn generate_request_response_config<
 		32,
 		MAX_RESPONSE_SIZE,
 		Duration::from_secs(10),
-		Some(inbound_queue),
+		inbound_queue,
 	)
 }
 
@@ -94,7 +96,7 @@ impl<TBlock: BlockT> RequestHandler<TBlock> {
 			protocol_id,
 			genesis_hash,
 			fork_id,
-			tx,
+			Some(tx),
 		);
 
 		(Self { backend, request_receiver }, request_response_config)

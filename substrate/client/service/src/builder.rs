@@ -61,9 +61,13 @@ use sc_network_sync::{
 	state_request_handler::StateRequestHandler,
 	strategy::{
 		polkadot::{PolkadotSyncingStrategy, PolkadotSyncingStrategyConfig},
+		warp::WarpSyncProvider,
 		SyncingStrategy,
 	},
-	warp_request_handler::RequestHandler as WarpSyncRequestHandler,
+	warp_request_handler::{
+		generate_request_response_config as generate_warp_sync_request_response_config,
+		RequestHandler as WarpSyncRequestHandler,
+	},
 	SyncingService, WarpSyncConfig,
 };
 use sc_rpc::{
@@ -920,6 +924,8 @@ where
 	>,
 	/// Optional warp sync config.
 	pub warp_sync_config: Option<WarpSyncConfig<Block>>,
+	/// Optional local warp sync provider used to serve inbound `/sync/warp` requests.
+	pub warp_sync_provider: Option<Arc<dyn WarpSyncProvider<Block>>>,
 	/// User specified block relay params. If not specified, the default
 	/// block request handler will be used.
 	pub block_relay: Option<BlockRelayParams<Block, Net>>,
@@ -963,6 +969,7 @@ where
 		import_queue,
 		block_announce_validator_builder,
 		warp_sync_config,
+		warp_sync_provider,
 		block_relay,
 		metrics,
 	} = params;
@@ -1007,6 +1014,7 @@ where
 		fork_id,
 		&mut net_config,
 		warp_sync_config,
+		warp_sync_provider,
 		block_downloader,
 		client.clone(),
 		&spawn_handle,
@@ -1268,6 +1276,8 @@ where
 	pub network_service_handle: NetworkServiceHandle,
 	/// Warp sync configuration (when used).
 	pub warp_sync_config: Option<WarpSyncConfig<Block>>,
+	/// Optional local warp sync provider used to serve inbound `/sync/warp` requests.
+	pub warp_sync_provider: Option<Arc<dyn WarpSyncProvider<Block>>>,
 	/// A shared client returned by `new_full_parts`.
 	pub client: Arc<Client>,
 	/// Blocks import queue API.
@@ -1306,6 +1316,7 @@ where
 		block_announce_validator,
 		network_service_handle,
 		warp_sync_config,
+		warp_sync_provider,
 		client,
 		import_queue_service,
 		num_peers_hint,
@@ -1328,6 +1339,7 @@ where
 		fork_id,
 		net_config,
 		warp_sync_config,
+		warp_sync_provider,
 		block_downloader,
 		client.clone(),
 		spawn_handle,
@@ -1395,6 +1407,7 @@ pub fn build_polkadot_syncing_strategy<Block, Client, Net>(
 	fork_id: Option<&str>,
 	net_config: &mut FullNetworkConfiguration<Block, <Block as BlockT>::Hash, Net>,
 	warp_sync_config: Option<WarpSyncConfig<Block>>,
+	warp_sync_provider: Option<Arc<dyn WarpSyncProvider<Block>>>,
 	block_downloader: Arc<dyn BlockDownloader<Block>>,
 	client: Arc<Client>,
 	spawn_handle: &SpawnTaskHandle,
@@ -1439,21 +1452,36 @@ where
 	};
 	net_config.add_request_response_protocol(state_request_protocol_config);
 
-	let (warp_sync_protocol_config, warp_sync_protocol_name) = match warp_sync_config.as_ref() {
-		Some(WarpSyncConfig::WithProvider(warp_with_provider)) => {
-			// Allow both outgoing and incoming requests.
+	let (warp_sync_protocol_config, warp_sync_protocol_name) = match (
+		warp_sync_config.as_ref(),
+		warp_sync_provider,
+	) {
+		(Some(_), Some(warp_sync_provider)) => {
+			// Keep local sync bootstrapping and inbound warp serving separate:
+			// any configured warp-capable full node should back `/sync/warp` with a live handler.
 			let (handler, protocol_config) = WarpSyncRequestHandler::new::<_, Net>(
-				protocol_id,
+				protocol_id.clone(),
 				genesis_hash,
 				fork_id,
-				warp_with_provider.clone(),
+				warp_sync_provider,
 			);
 			let config_name = protocol_config.protocol_name().clone();
 
 			spawn_handle.spawn("warp-sync-request-handler", Some("networking"), handler.run());
 			(Some(protocol_config), Some(config_name))
 		},
-		_ => (None, None),
+		(Some(_), None) => {
+			let protocol_config = generate_warp_sync_request_response_config::<_, Block, Net>(
+				protocol_id.clone(),
+				genesis_hash,
+				fork_id,
+				None,
+			);
+			let config_name = protocol_config.protocol_name().clone();
+
+			(Some(protocol_config), Some(config_name))
+		},
+		(None, _) => (None, None),
 	};
 	if let Some(config) = warp_sync_protocol_config {
 		net_config.add_request_response_protocol(config);

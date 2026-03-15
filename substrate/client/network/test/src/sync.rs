@@ -18,6 +18,8 @@
 
 use super::*;
 use futures::Future;
+use sc_network::{request_responses::IfDisconnected, service::traits::NetworkRequest};
+use sc_network_sync::strategy::warp::WarpProofRequest;
 use sp_consensus::{block_validation::Validation, BlockOrigin};
 use sp_runtime::Justifications;
 use substrate_test_runtime::Header;
@@ -1299,6 +1301,75 @@ async fn warp_sync_to_target_block() {
 		}
 	})
 	.await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn warp_sync_target_peer_serves_inbound_requests() {
+	sp_tracing::try_init_simple();
+	let mut net = TestNet::new(0);
+	net.add_full_peer_with_config(Default::default());
+	net.add_full_peer_with_config(Default::default());
+	net.add_full_peer_with_config(Default::default());
+
+	let blocks = net.peer(0).push_blocks(64, false);
+	let target = blocks[63];
+	net.peer(1).push_blocks(64, false);
+	net.peer(2).push_blocks(64, false);
+
+	let target_block = net.peer(0).client.header(target).unwrap().unwrap();
+
+	net.add_full_peer_with_config(FullPeerConfig {
+		sync_mode: SyncMode::Warp,
+		target_header: Some(target_block),
+		..Default::default()
+	});
+
+	net.run_until_sync().await;
+
+	let begin = net
+		.peer(0)
+		.client
+		.as_client()
+		.hash(0u32.into())
+		.unwrap()
+		.expect("Genesis block exists; qed");
+	let request = WarpProofRequest::<Block> { begin }.encode();
+	let requester = net.peer(0).network_service().clone();
+	let target_peer_id = net.peer(3).id();
+	let warp_protocol = format!(
+		"/{}/sync/warp",
+		sp_core::hexdisplay::HexDisplay::from(&net.peer(0).client.info().genesis_hash.as_bytes()),
+	);
+	let expected_header = {
+		let best_hash = net.peer(3).client.info().best_hash;
+		net.peer(3).client.header(best_hash).unwrap().unwrap()
+	};
+
+	let response = timeout(Duration::from_secs(10), async {
+		let request = requester.request(
+			target_peer_id.into(),
+			warp_protocol.clone().into(),
+			request,
+			None,
+			IfDisconnected::ImmediateError,
+		);
+
+		futures::pin_mut!(request);
+		futures::future::poll_fn(|cx| {
+			net.poll(cx);
+			match request.as_mut().poll(cx) {
+				Poll::Ready(result) => Poll::Ready(result.expect("warp request should succeed")),
+				Poll::Pending => Poll::Pending,
+			}
+		})
+		.await
+	})
+	.await
+	.expect("warp request timed out");
+
+	assert_eq!(response.1.as_ref(), warp_protocol);
+	let header = <Header as Decode>::decode(&mut response.0.as_slice()).unwrap();
+	assert_eq!(header, expected_header);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
