@@ -65,6 +65,7 @@ pub struct GrandpaBlockImport<Backend, Block: BlockT, Client, SC> {
 	send_voter_commands: TracingUnboundedSender<VoterCommand<Block::Hash, NumberFor<Block>>>,
 	authority_set_hard_forks:
 		Mutex<HashMap<Block::Hash, PendingChange<Block::Hash, NumberFor<Block>>>>,
+	justification_exemption_ranges: Vec<(NumberFor<Block>, NumberFor<Block>)>,
 	justification_sender: GrandpaJustificationSender<Block>,
 	telemetry: Option<TelemetryHandle>,
 	_phantom: PhantomData<Backend>,
@@ -81,6 +82,7 @@ impl<Backend, Block: BlockT, Client, SC: Clone> Clone
 			authority_set: self.authority_set.clone(),
 			send_voter_commands: self.send_voter_commands.clone(),
 			authority_set_hard_forks: Mutex::new(self.authority_set_hard_forks.lock().clone()),
+			justification_exemption_ranges: self.justification_exemption_ranges.clone(),
 			justification_sender: self.justification_sender.clone(),
 			telemetry: self.telemetry.clone(),
 			_phantom: PhantomData,
@@ -237,6 +239,12 @@ where
 	Client::Api: GrandpaApi<Block>,
 	for<'a> &'a Client: BlockImport<Block, Error = ConsensusError>,
 {
+	pub(crate) fn is_justification_exempt(&self, number: NumberFor<Block>) -> bool {
+		self.justification_exemption_ranges
+			.iter()
+			.any(|(last_finalized, hard_fork_block)| *last_finalized < number && number <= *hard_fork_block)
+	}
+
 	// check for a new authority set change.
 	fn check_new_change(
 		&self,
@@ -532,6 +540,7 @@ where
 	) -> Result<ImportResult, Self::Error> {
 		let hash = block.post_hash();
 		let number = *block.header.number();
+		let is_gap_sync = block.is_gap_sync;
 
 		// early exit if block already in chain, otherwise the check for
 		// authority changes will error when trying to re-import a change block
@@ -552,12 +561,16 @@ where
 		if number <= self.inner.info().finalized_number {
 			// Importing an old block. Just save justifications and authority set changes
 			if self.check_new_change(&block.header, hash).is_some() {
+				let allow_missing_justification =
+					is_gap_sync && self.is_justification_exempt(number);
 				if block.justifications.is_none() {
-					return Err(ConsensusError::ClientImport(
-						"Justification required when importing \
-							an old block with authority set change."
-							.into(),
-					))
+					if !allow_missing_justification {
+						return Err(ConsensusError::ClientImport(
+							"Justification required when importing \
+								an old block with authority set change."
+								.into(),
+						))
+					}
 				}
 				let mut authority_set = self.authority_set.inner_locked();
 				authority_set.authority_set_changes.insert(number);
@@ -719,6 +732,15 @@ impl<Backend, Block: BlockT, Client, SC> GrandpaBlockImport<Backend, Block, Clie
 		justification_sender: GrandpaJustificationSender<Block>,
 		telemetry: Option<TelemetryHandle>,
 	) -> GrandpaBlockImport<Backend, Block, Client, SC> {
+		let justification_exemption_ranges = authority_set_hard_forks
+			.iter()
+			.filter_map(|(_, change)| match change.delay_kind {
+				DelayKind::Best { median_last_finalized } =>
+					Some((median_last_finalized, change.canon_height)),
+				DelayKind::Finalized => None,
+			})
+			.collect();
+
 		// check for and apply any forced authority set hard fork that applies
 		// to the *current* authority set.
 		if let Some((_, change)) = authority_set_hard_forks
@@ -755,6 +777,7 @@ impl<Backend, Block: BlockT, Client, SC> GrandpaBlockImport<Backend, Block, Clie
 			authority_set,
 			send_voter_commands,
 			authority_set_hard_forks: Mutex::new(authority_set_hard_forks),
+			justification_exemption_ranges,
 			justification_sender,
 			telemetry,
 			_phantom: PhantomData,

@@ -510,7 +510,9 @@ mod tests {
 			&self,
 			block: BlockImportParams<Block>,
 		) -> Result<BlockImportParams<Block>, String> {
-			Ok(BlockImportParams::new(block.origin, block.header))
+			let mut import = BlockImportParams::new(block.origin, block.header);
+			import.is_gap_sync = block.is_gap_sync;
+			Ok(import)
 		}
 	}
 
@@ -618,6 +620,7 @@ mod tests {
 						import_existing: false,
 						state: None,
 						skip_execution: false,
+						is_gap_sync: false,
 					}],
 				))
 				.unwrap();

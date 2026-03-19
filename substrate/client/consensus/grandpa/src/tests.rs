@@ -996,6 +996,108 @@ async fn test_bad_justification() {
 }
 
 #[tokio::test]
+async fn forced_hard_fork_gap_allows_missing_justifications_only_inside_range() {
+	let peers = &[Ed25519Keyring::Alice, Ed25519Keyring::Bob, Ed25519Keyring::Charlie];
+	let voters = make_ids(peers);
+	let api = TestApi::new(voters);
+	let mut net = GrandpaTestNet::new(api.clone(), 3, 0);
+	let client = net.peer(0).client().clone();
+	let full_client = client.as_client();
+
+	let hard_fork = AuthoritySetHardFork {
+		set_id: 1,
+		block: (H256::repeat_byte(1), 10),
+		authorities: make_ids(&[Ed25519Keyring::Alice]),
+		last_finalized: Some(5),
+	};
+
+	let (block_import, _) = block_import_with_authority_set_hard_forks(
+		full_client.clone(),
+		JUSTIFICATION_IMPORT_PERIOD,
+		&api,
+		LongestChain::new(client.as_backend()),
+		vec![hard_fork],
+		None,
+	)
+	.unwrap();
+
+	assert!(!block_import.is_justification_exempt(5));
+	assert!(block_import.is_justification_exempt(6));
+	assert!(block_import.is_justification_exempt(10));
+	assert!(!block_import.is_justification_exempt(11));
+}
+
+#[tokio::test]
+async fn hard_fork_without_last_finalized_does_not_allow_missing_justifications() {
+	let peers = &[Ed25519Keyring::Alice, Ed25519Keyring::Bob, Ed25519Keyring::Charlie];
+	let voters = make_ids(peers);
+	let api = TestApi::new(voters);
+	let mut net = GrandpaTestNet::new(api.clone(), 3, 0);
+	let client = net.peer(0).client().clone();
+	let full_client = client.as_client();
+
+	let hard_fork = AuthoritySetHardFork {
+		set_id: 1,
+		block: (H256::repeat_byte(2), 10),
+		authorities: make_ids(&[Ed25519Keyring::Alice]),
+		last_finalized: None,
+	};
+
+	let (block_import, _) = block_import_with_authority_set_hard_forks(
+		full_client.clone(),
+		JUSTIFICATION_IMPORT_PERIOD,
+		&api,
+		LongestChain::new(client.as_backend()),
+		vec![hard_fork],
+		None,
+	)
+	.unwrap();
+
+	assert!(!block_import.is_justification_exempt(9));
+	assert!(!block_import.is_justification_exempt(10));
+}
+
+#[tokio::test]
+async fn multiple_forced_hard_fork_gaps_create_multiple_exemption_ranges() {
+	let peers = &[Ed25519Keyring::Alice, Ed25519Keyring::Bob, Ed25519Keyring::Charlie];
+	let voters = make_ids(peers);
+	let api = TestApi::new(voters);
+	let mut net = GrandpaTestNet::new(api.clone(), 3, 0);
+	let client = net.peer(0).client().clone();
+	let full_client = client.as_client();
+
+	let hard_forks = vec![
+		AuthoritySetHardFork {
+			set_id: 1,
+			block: (H256::repeat_byte(3), 10),
+			authorities: make_ids(&[Ed25519Keyring::Alice]),
+			last_finalized: Some(5),
+		},
+		AuthoritySetHardFork {
+			set_id: 2,
+			block: (H256::repeat_byte(4), 20),
+			authorities: make_ids(&[Ed25519Keyring::Bob]),
+			last_finalized: Some(15),
+		},
+	];
+
+	let (block_import, _) = block_import_with_authority_set_hard_forks(
+		full_client.clone(),
+		JUSTIFICATION_IMPORT_PERIOD,
+		&api,
+		LongestChain::new(client.as_backend()),
+		hard_forks,
+		None,
+	)
+	.unwrap();
+
+	assert!(block_import.is_justification_exempt(6));
+	assert!(block_import.is_justification_exempt(20));
+	assert!(!block_import.is_justification_exempt(14));
+	assert!(!block_import.is_justification_exempt(21));
+}
+
+#[tokio::test]
 async fn voter_persists_its_votes() {
 	use futures::future;
 	use std::sync::atomic::{AtomicUsize, Ordering};

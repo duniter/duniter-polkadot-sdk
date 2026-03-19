@@ -218,6 +218,8 @@ pub struct BlockImportParams<Block: BlockT> {
 	pub create_gap: bool,
 	/// Cached full header hash (with post-digests applied).
 	pub post_hash: Option<Block::Hash>,
+	/// Whether this block comes from gap sync historical backfill.
+	pub is_gap_sync: bool,
 }
 
 impl<Block: BlockT> BlockImportParams<Block> {
@@ -238,6 +240,7 @@ impl<Block: BlockT> BlockImportParams<Block> {
 			import_existing: false,
 			create_gap: true,
 			post_hash: None,
+			is_gap_sync: false,
 		}
 	}
 

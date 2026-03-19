@@ -93,6 +93,8 @@ pub struct IncomingBlock<B: BlockT> {
 	pub import_existing: bool,
 	/// Do not compute new state, but rather set it to the given set.
 	pub state: Option<ImportedState<B>>,
+	/// Whether this block was queued by gap sync historical backfill.
+	pub is_gap_sync: bool,
 }
 
 /// Verify a justification of a block
@@ -347,6 +349,7 @@ pub(crate) async fn verify_single_block_metered<B: BlockT, V: Verifier<B>>(
 	import_block.post_hash = Some(hash);
 	import_block.import_existing = block.import_existing;
 	import_block.indexed_body = block.indexed_body;
+	import_block.is_gap_sync = block.is_gap_sync;
 
 	if let Some(state) = block.state {
 		let changes = crate::block_import::StorageChanges::Import(state);
