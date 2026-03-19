@@ -474,20 +474,24 @@ where
 					),
 				};
 
-				// check if there's any pending standard change that we depend on
-				for (_, _, standard_change) in self.pending_standard_changes.roots() {
-					if standard_change.effective_number() <= median_last_finalized &&
-						is_descendent_of(&standard_change.canon_hash, &change.canon_hash)?
-					{
-						log::info!(target: LOG_TARGET,
-							"Not applying authority set change forced at block #{:?}, due to pending standard change at block #{:?}",
-							change.canon_height,
-							standard_change.effective_number(),
-						);
+				// Runtime forced changes preserve the historical dependency check
+				// against pending standard changes. Hard-forked forced changes are
+				// allowed to reset the authority set from a known good state.
+				if change.origin == ChangeOrigin::Runtime {
+					for (_, _, standard_change) in self.pending_standard_changes.roots() {
+						if standard_change.effective_number() <= median_last_finalized &&
+							is_descendent_of(&standard_change.canon_hash, &change.canon_hash)?
+						{
+							log::info!(target: LOG_TARGET,
+								"Not applying authority set change forced at block #{:?}, due to pending standard change at block #{:?}",
+								change.canon_height,
+								standard_change.effective_number(),
+							);
 
-						return Err(Error::ForcedAuthoritySetChangeDependencyUnsatisfied(
-							standard_change.effective_number(),
-						))
+							return Err(Error::ForcedAuthoritySetChangeDependencyUnsatisfied(
+								standard_change.effective_number(),
+							))
+						}
 					}
 				}
 
@@ -642,6 +646,15 @@ pub enum DelayKind<N> {
 	Best { median_last_finalized: N },
 }
 
+/// Origin of a pending authority set change.
+#[derive(Debug, Clone, Encode, Decode, PartialEq)]
+pub enum ChangeOrigin {
+	/// Change extracted from the runtime GRANDPA digest.
+	Runtime,
+	/// Change injected explicitly as an authority set hard fork.
+	HardFork,
+}
+
 /// A pending change to the authority set.
 ///
 /// This will be applied when the announcing block is at some depth within
@@ -659,6 +672,8 @@ pub struct PendingChange<H, N> {
 	pub(crate) canon_hash: H,
 	/// The delay kind.
 	pub(crate) delay_kind: DelayKind<N>,
+	/// The source of the change.
+	pub(crate) origin: ChangeOrigin,
 }
 
 impl<H: Decode, N: Decode> Decode for PendingChange<H, N> {
@@ -669,8 +684,9 @@ impl<H: Decode, N: Decode> Decode for PendingChange<H, N> {
 		let canon_hash = Decode::decode(value)?;
 
 		let delay_kind = DelayKind::decode(value).unwrap_or(DelayKind::Finalized);
+		let origin = ChangeOrigin::decode(value).unwrap_or(ChangeOrigin::Runtime);
 
-		Ok(PendingChange { next_authorities, delay, canon_height, canon_hash, delay_kind })
+		Ok(PendingChange { next_authorities, delay, canon_height, canon_hash, delay_kind, origin })
 	}
 }
 
@@ -815,6 +831,7 @@ mod tests {
 			canon_height: height,
 			canon_hash: height.to_string(),
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let is_descendent_of = static_is_descendent_of(false);
@@ -849,6 +866,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_a",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let change_b = PendingChange {
@@ -857,6 +875,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_b",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let change_c = PendingChange {
@@ -865,6 +884,7 @@ mod tests {
 			canon_height: 10,
 			canon_hash: "hash_c",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		authorities
@@ -891,6 +911,7 @@ mod tests {
 			canon_height: 1,
 			canon_hash: "hash_d",
 			delay_kind: DelayKind::Best { median_last_finalized: 0 },
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let change_e = PendingChange {
@@ -899,6 +920,7 @@ mod tests {
 			canon_height: 0,
 			canon_hash: "hash_e",
 			delay_kind: DelayKind::Best { median_last_finalized: 0 },
+			origin: ChangeOrigin::Runtime,
 		};
 
 		authorities
@@ -935,6 +957,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_a",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let change_b = PendingChange {
@@ -943,6 +966,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_b",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		authorities
@@ -1018,6 +1042,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_a",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let change_c = PendingChange {
@@ -1026,6 +1051,7 @@ mod tests {
 			canon_height: 30,
 			canon_hash: "hash_c",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		authorities
@@ -1096,6 +1122,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_a",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let change_b = PendingChange {
@@ -1104,6 +1131,7 @@ mod tests {
 			canon_height: 20,
 			canon_hash: "hash_b",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		authorities
@@ -1168,6 +1196,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_a",
 			delay_kind: DelayKind::Best { median_last_finalized: 42 },
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let change_b = PendingChange {
@@ -1176,6 +1205,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_b",
 			delay_kind: DelayKind::Best { median_last_finalized: 0 },
+			origin: ChangeOrigin::Runtime,
 		};
 
 		authorities
@@ -1207,6 +1237,7 @@ mod tests {
 			canon_height: 8,
 			canon_hash: "hash_a8",
 			delay_kind: DelayKind::Best { median_last_finalized: 0 },
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let is_descendent_of_a = is_descendent_of(|base: &&str, _| base.starts_with("hash_a"));
@@ -1268,6 +1299,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_a",
 			delay_kind: DelayKind::Best { median_last_finalized: 0 },
+			origin: ChangeOrigin::Runtime,
 		};
 
 		// and import it
@@ -1301,6 +1333,7 @@ mod tests {
 			canon_height: 10,
 			canon_hash: "hash_a",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		// effective #20
@@ -1310,6 +1343,7 @@ mod tests {
 			canon_height: 20,
 			canon_hash: "hash_b",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		// effective at #35
@@ -1319,6 +1353,7 @@ mod tests {
 			canon_height: 30,
 			canon_hash: "hash_c",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		// add some pending standard changes all on the same fork
@@ -1339,6 +1374,7 @@ mod tests {
 			canon_height: 40,
 			canon_hash: "hash_d",
 			delay_kind: DelayKind::Best { median_last_finalized: 31 },
+			origin: ChangeOrigin::Runtime,
 		};
 
 		// now add a forced change on the same fork
@@ -1408,6 +1444,63 @@ mod tests {
 	}
 
 	#[test]
+	fn hard_fork_forced_changes_bypass_pending_standard_dependencies() {
+		let set_a = vec![(AuthorityId::from_slice(&[1; 32]).unwrap(), 1)];
+		let set_b = vec![(AuthorityId::from_slice(&[2; 32]).unwrap(), 2)];
+
+		let mut authorities = AuthoritySet {
+			current_authorities: set_a.clone(),
+			set_id: 0,
+			pending_standard_changes: ForkTree::new(),
+			pending_forced_changes: Vec::new(),
+			authority_set_changes: AuthoritySetChanges::empty(),
+		};
+
+		let standard_change = PendingChange {
+			next_authorities: set_a.clone(),
+			delay: 5,
+			canon_height: 10,
+			canon_hash: "hash_a",
+			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
+		};
+
+		let hard_fork_forced_change = PendingChange {
+			next_authorities: set_b.clone(),
+			delay: 5,
+			canon_height: 40,
+			canon_hash: "hash_d",
+			delay_kind: DelayKind::Best { median_last_finalized: 31 },
+			origin: ChangeOrigin::HardFork,
+		};
+
+		authorities
+			.add_pending_change(standard_change, &static_is_descendent_of(true))
+			.unwrap();
+		authorities
+			.add_pending_change(hard_fork_forced_change, &static_is_descendent_of(true))
+			.unwrap();
+
+		let (median, new_set) = authorities
+			.apply_forced_changes("hash_d45", 45, &static_is_descendent_of(true), false, None)
+			.unwrap()
+			.expect("hard-fork forced change should bypass old pending standard changes");
+
+		assert_eq!(median, 31);
+		assert_eq!(
+			new_set,
+			AuthoritySet {
+				current_authorities: set_b,
+				set_id: 1,
+				pending_standard_changes: ForkTree::new(),
+				pending_forced_changes: Vec::new(),
+				authority_set_changes: AuthoritySetChanges(vec![(0, 31)]),
+			}
+		);
+		assert_eq!(authorities.authority_set_changes, AuthoritySetChanges::empty());
+	}
+
+	#[test]
 	fn next_change_works() {
 		let current_authorities = vec![(AuthorityId::from_slice(&[1; 32]).unwrap(), 1)];
 
@@ -1429,6 +1522,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: "hash_a0",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let change_a1 = PendingChange {
@@ -1437,6 +1531,7 @@ mod tests {
 			canon_height: 10,
 			canon_hash: "hash_a1",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		let change_b = PendingChange {
@@ -1445,6 +1540,7 @@ mod tests {
 			canon_height: 4,
 			canon_hash: "hash_b",
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		// A0 (#5) <- A10 (#8) <- A1 (#10) <- best_a
@@ -1496,6 +1592,7 @@ mod tests {
 			canon_height: 8,
 			canon_hash: "hash_a10",
 			delay_kind: DelayKind::Best { median_last_finalized: 0 },
+			origin: ChangeOrigin::Runtime,
 		};
 
 		authorities
@@ -1552,6 +1649,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: (),
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		};
 
 		// pending change contains an empty authority set
@@ -1569,6 +1667,7 @@ mod tests {
 			canon_height: 5,
 			canon_hash: (),
 			delay_kind: DelayKind::Best { median_last_finalized: 0 },
+			origin: ChangeOrigin::Runtime,
 		};
 
 		// pending change contains an an authority set
@@ -1630,6 +1729,7 @@ mod tests {
 				} else {
 					DelayKind::Finalized
 				},
+				origin: ChangeOrigin::Runtime,
 			};
 
 			authorities.add_pending_change(change, &is_descendent_of).unwrap();

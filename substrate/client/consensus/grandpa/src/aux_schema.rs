@@ -32,7 +32,8 @@ use sp_runtime::traits::{Block as BlockT, NumberFor};
 
 use crate::{
 	authorities::{
-		AuthoritySet, AuthoritySetChanges, DelayKind, PendingChange, SharedAuthoritySet,
+		AuthoritySet, AuthoritySetChanges, ChangeOrigin, DelayKind, PendingChange,
+		SharedAuthoritySet,
 	},
 	environment::{
 		CompletedRound, CompletedRounds, CurrentRounds, HasVoted, SharedVoterSetState,
@@ -91,6 +92,7 @@ where
 				canon_height: old_change.canon_height,
 				canon_hash: old_change.canon_hash,
 				delay_kind: DelayKind::Finalized,
+				origin: ChangeOrigin::Runtime,
 			};
 
 			if let Err(err) = pending_standard_changes.import::<_, ClientError>(

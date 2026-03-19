@@ -597,6 +597,7 @@ where
 					canon_hash: fork.block.0,
 					canon_height: fork.block.1,
 					delay_kind,
+					origin: authorities::ChangeOrigin::HardFork,
 				},
 			)
 		})

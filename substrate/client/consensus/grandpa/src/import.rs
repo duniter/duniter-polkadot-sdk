@@ -40,7 +40,7 @@ use sp_runtime::{
 };
 
 use crate::{
-	authorities::{AuthoritySet, DelayKind, PendingChange, SharedAuthoritySet},
+	authorities::{AuthoritySet, ChangeOrigin, DelayKind, PendingChange, SharedAuthoritySet},
 	environment,
 	justification::GrandpaJustification,
 	notification::GrandpaJustificationSender,
@@ -256,6 +256,7 @@ where
 				canon_height: *header.number(),
 				canon_hash: hash,
 				delay_kind: DelayKind::Best { median_last_finalized },
+				origin: ChangeOrigin::Runtime,
 			})
 		}
 
@@ -267,6 +268,7 @@ where
 			canon_height: *header.number(),
 			canon_hash: hash,
 			delay_kind: DelayKind::Finalized,
+			origin: ChangeOrigin::Runtime,
 		})
 	}
 
