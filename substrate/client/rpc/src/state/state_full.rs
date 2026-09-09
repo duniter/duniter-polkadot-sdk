@@ -23,7 +23,7 @@ use std::{collections::HashMap, marker::PhantomData, sync::Arc, time::Duration};
 use super::{
 	client_err,
 	error::{Error, Result},
-	ChildStateBackend, StateBackend,
+	validate_storage_keys_count, ChildStateBackend, StateBackend,
 };
 use crate::{
 	utils::{spawn_subscription_task, BoundedVecDeque, PendingSubscription},
@@ -210,17 +210,18 @@ where
 			.map_err(client_err)
 	}
 
-	// TODO: This is horribly broken; either remove it, or make it streaming.
 	fn storage_keys(
 		&self,
 		block: Option<Block::Hash>,
 		prefix: StorageKey,
 	) -> std::result::Result<Vec<StorageKey>, Error> {
-		// TODO: Remove the `.collect`.
-		self.block_or_best(block)
+		let keys = self
+			.block_or_best(block)
 			.and_then(|block| self.client.storage_keys(block, Some(&prefix), None))
-			.map(|iter| iter.collect())
-			.map_err(client_err)
+			.map(|iter| iter.take(super::STORAGE_KEYS_MAX_COUNT + 1).collect::<Vec<_>>())
+			.map_err(client_err)?;
+		validate_storage_keys_count(keys.len())?;
+		Ok(keys)
 	}
 
 	// TODO: This is horribly broken; either remove it, or make it streaming.
@@ -547,8 +548,8 @@ where
 		storage_key: PrefixedStorageKey,
 		prefix: StorageKey,
 	) -> std::result::Result<Vec<StorageKey>, Error> {
-		// TODO: Remove the `.collect`.
-		self.block_or_best(block)
+		let keys = self
+			.block_or_best(block)
 			.and_then(|block| {
 				let child_info = match ChildType::from_prefixed_key(&storage_key) {
 					Some((ChildType::ParentKeyId, storage_key)) => {
@@ -558,8 +559,10 @@ where
 				};
 				self.client.child_storage_keys(block, child_info, Some(&prefix), None)
 			})
-			.map(|iter| iter.collect())
-			.map_err(client_err)
+			.map(|iter| iter.take(super::STORAGE_KEYS_MAX_COUNT + 1).collect::<Vec<_>>())
+			.map_err(client_err)?;
+		validate_storage_keys_count(keys.len())?;
+		Ok(keys)
 	}
 
 	fn storage_keys_paged(

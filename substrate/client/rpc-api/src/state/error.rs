@@ -50,6 +50,23 @@ pub enum Error {
 	/// Call to an unsafe RPC was denied.
 	#[error(transparent)]
 	UnsafeRpcCalled(#[from] crate::policy::UnsafeRpcError),
+	/// A legacy unpaged storage-key query returned too many results.
+	#[error("storage key result exceeds maximum value. max: {max}; use state_getKeysPaged")]
+	TooManyStorageKeys {
+		/// Maximum number of results returned by an unpaged query.
+		max: usize,
+	},
+	/// Runtime API call data exceeds the public RPC limit.
+	#[error("runtime API call data exceeds maximum size. value: {value}, max: {max}")]
+	RuntimeCallDataTooLarge {
+		/// Provided call data size.
+		value: usize,
+		/// Maximum allowed call data size.
+		max: usize,
+	},
+	/// All runtime API execution slots are occupied.
+	#[error("too many concurrent runtime API calls")]
+	TooManyRuntimeCalls,
 }
 
 /// Base code for all state errors.

@@ -40,10 +40,60 @@ use sp_core::{
 use sp_runtime::traits::Block as BlockT;
 use sp_version::RuntimeVersion;
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 
 pub use sc_rpc_api::{child_state::*, state::*};
 
-const STORAGE_KEYS_PAGED_MAX_COUNT: u32 = 1000;
+/// Maximum number of keys returned by legacy unpaged storage queries.
+pub const STORAGE_KEYS_MAX_COUNT: usize = 1000;
+/// Maximum SCALE-encoded input accepted by `state_call`.
+pub const STATE_CALL_MAX_DATA_SIZE: usize = 5 * 1024 * 1024;
+const MAX_CONCURRENT_STATE_CALLS: usize = 4;
+
+const SAFE_RUNTIME_CALLS: &[&str] = &[
+	"Core_version",
+	"Metadata_metadata",
+	"Metadata_metadata_at_version",
+	"Metadata_metadata_versions",
+	"AccountNonceApi_account_nonce",
+	"TransactionPaymentApi_query_info",
+	"TransactionPaymentApi_query_fee_details",
+	"TransactionPaymentApi_query_weight_to_fee",
+	"TransactionPaymentApi_query_length_to_fee",
+	"DuniterAccountApi_estimate_cost",
+	"UniversalDividendApi_account_balances",
+];
+
+/// Return whether a runtime API method may be called through a public RPC endpoint.
+pub fn is_safe_runtime_call(method: &str) -> bool {
+	SAFE_RUNTIME_CALLS.contains(&method)
+}
+
+/// Validate the public policy and input size for a runtime API call.
+pub fn validate_runtime_call(
+	deny_unsafe: DenyUnsafe,
+	method: &str,
+	data_size: usize,
+) -> Result<(), Error> {
+	if data_size > STATE_CALL_MAX_DATA_SIZE {
+		return Err(Error::RuntimeCallDataTooLarge {
+			value: data_size,
+			max: STATE_CALL_MAX_DATA_SIZE,
+		});
+	}
+	if !is_safe_runtime_call(method) {
+		deny_unsafe.check_if_safe()?;
+	}
+	Ok(())
+}
+
+/// Reject an unpaged storage-key result that exceeds the public bound.
+pub fn validate_storage_keys_count(count: usize) -> Result<(), Error> {
+	if count > STORAGE_KEYS_MAX_COUNT {
+		return Err(Error::TooManyStorageKeys { max: STORAGE_KEYS_MAX_COUNT });
+	}
+	Ok(())
+}
 
 /// State backend API.
 #[async_trait]
@@ -192,12 +242,16 @@ where
 	));
 	let backend =
 		Box::new(self::state_full::FullState::new(client, executor, execute_block.clone()));
-	(State { backend }, ChildState { backend: child_backend })
+	(
+		State { backend, state_call_slots: Semaphore::new(MAX_CONCURRENT_STATE_CALLS) },
+		ChildState { backend: child_backend },
+	)
 }
 
 /// State API with subscriptions support.
 pub struct State<Block, Client> {
 	backend: Box<dyn StateBackend<Block, Client>>,
+	state_call_slots: Semaphore,
 }
 
 #[async_trait]
@@ -208,10 +262,18 @@ where
 {
 	fn call(
 		&self,
+		ext: &Extensions,
 		method: String,
 		data: Bytes,
 		block: Option<Block::Hash>,
 	) -> Result<Bytes, Error> {
+		let deny_unsafe = ext
+			.get::<DenyUnsafe>()
+			.copied()
+			.expect("DenyUnsafe extension is always set by the substrate rpc server; qed");
+		validate_runtime_call(deny_unsafe, &method, data.0.len())?;
+		let _permit =
+			self.state_call_slots.try_acquire().map_err(|_| Error::TooManyRuntimeCalls)?;
 		self.backend.call(block, method, data).map_err(Into::into)
 	}
 
@@ -240,8 +302,8 @@ where
 		start_key: Option<StorageKey>,
 		block: Option<Block::Hash>,
 	) -> Result<Vec<StorageKey>, Error> {
-		if count > STORAGE_KEYS_PAGED_MAX_COUNT {
-			return Err(Error::InvalidCount { value: count, max: STORAGE_KEYS_PAGED_MAX_COUNT });
+		if count as usize > STORAGE_KEYS_MAX_COUNT {
+			return Err(Error::InvalidCount { value: count, max: STORAGE_KEYS_MAX_COUNT as u32 });
 		}
 		self.backend
 			.storage_keys_paged(block, prefix, count, start_key)

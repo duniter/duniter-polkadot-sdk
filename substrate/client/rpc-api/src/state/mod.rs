@@ -35,7 +35,7 @@ pub use error::Error;
 #[rpc(client, server)]
 pub trait StateApi<Hash> {
 	/// Call a method from the runtime API at a block's state.
-	#[method(name = "state_call", aliases = ["state_callAt"], blocking)]
+	#[method(name = "state_call", aliases = ["state_callAt"], blocking, with_extensions)]
 	fn call(&self, name: String, bytes: Bytes, hash: Option<Hash>) -> Result<Bytes, Error>;
 
 	/// Returns the keys with prefix, leave empty to get all the keys.
